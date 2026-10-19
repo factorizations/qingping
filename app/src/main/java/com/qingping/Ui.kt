@@ -49,7 +49,7 @@ object Ui {
         val d = GradientDrawable()
         d.setColor(color)
         d.shape = GradientDrawable.RECTANGLE
-        d.cornerRadius = dp(activity, 999f)
+        d.cornerRadius = dp(activity, 999f).toFloat()
         return d
     }
 
