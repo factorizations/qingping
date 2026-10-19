@@ -33,7 +33,7 @@ object Ui {
         return LinearLayout(activity).apply {
             orientation = LinearLayout.VERTICAL
             background = round(activity, Color.WHITE, 20f)
-            elevation = dp(activity, 1f)
+            elevation = dp(activity, 1f).toFloat()
             setPadding(dp(activity, 18f), dp(activity, 16f), dp(activity, 18f), dp(activity, 16f))
         }
     }
@@ -41,7 +41,7 @@ object Ui {
     fun round(activity: Activity, color: Int, radiusDp: Float): GradientDrawable {
         val d = GradientDrawable()
         d.setColor(color)
-        d.cornerRadius = dp(activity, radiusDp)
+        d.cornerRadius = dp(activity, radiusDp).toFloat()
         return d
     }
 
