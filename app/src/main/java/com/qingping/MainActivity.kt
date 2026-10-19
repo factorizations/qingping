@@ -1,21 +1,24 @@
+
 package com.qingping
 
-import android.Manifest
 import android.app.Activity
 import android.app.AlertDialog
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.Switch
+import android.widget.ScrollView
 import android.widget.TextView
 import android.widget.Toast
 import java.text.SimpleDateFormat
@@ -23,139 +26,255 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 主界面（0.3）：状态卡、规则开关、按应用统计、事件摘要。
- * 延续 0.2 的纯代码 UI（零布局 XML 依赖），并新增规则开关与名单入口。
+ * 主界面（0.5 重设计）：Material 风格三卡布局。
+ * 1) 状态卡：服务运行状态大标识 + 一键授权
+ * 2) 统计卡：累计/今日大数字 + 按应用排行（带图标）
+ * 3) 规则卡：三条开关 + 名单入口
+ * 参考业界同类（GKD/李跳跳）：首屏突出权限状态，其次统计。
  */
 class MainActivity : Activity() {
 
-    private lateinit var status: TextView
-    private lateinit var overview: TextView
-    private lateinit var stats: TextView
-    private lateinit var recent: TextView
-    private lateinit var swSkip: Switch
-    private lateinit var swClose: Switch
-    private lateinit var swJump: Switch
+    private lateinit var statusCard: LinearLayout
+    private lateinit var statusDot: TextView
+    private lateinit var statusTitle: TextView
+    private lateinit var statusSub: TextView
+    private lateinit var statusBtn: TextView
+    private lateinit var statTotal: TextView
+    private lateinit var statToday: TextView
+    private lateinit var appList: LinearLayout
+    private lateinit var emptyHint: TextView
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         AppPrefs.init(this)
         StatsStore.init(this)
 
+        val scroll = ScrollView(this).apply { setBackgroundColor(Ui.SURFACE) }
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(28, 28, 28, 24)
+            setPadding(Ui.dp(this@MainActivity, 16f), Ui.dp(this@MainActivity, 20f), Ui.dp(this@MainActivity, 16f), Ui.dp(this@MainActivity, 24f))
         }
-        root.addView(TextView(this).apply { text = "清屏 0.3"; textSize = 30f })
-        root.addView(TextView(this).apply {
-            text = "开屏跳过 · 广告页关闭 · 误触跳转返回 · 本地统计"
-            textSize = 13f; setPadding(0, 6, 0, 18)
+        scroll.addView(root)
+
+        // ===== 标题栏 =====
+        val title = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }
+        title.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_app)
+            layoutParams = LinearLayout.LayoutParams(Ui.dp(this@MainActivity, 30f), Ui.dp(this@MainActivity, 30f))
+        })
+        title.addView(Ui.text(this, "  清屏", 22f, Ui.ON_SURFACE, bold = true))
+        title.addView(Ui.text(this, "  v0.5", 12f, Ui.ON_SURFACE_VAR).apply { gravity = Gravity.BOTTOM })
+        root.addView(title)
+        root.addView(Ui.text(this, "自动跳过开屏广告 · 拦截误触跳转 · 数据仅存本机", 12f, Ui.ON_SURFACE_VAR).apply {
+            setPadding(0, Ui.dp(this@MainActivity, 4f), 0, Ui.dp(this@MainActivity, 14f))
         })
 
-        status = TextView(this).apply { textSize = 15f }
-        root.addView(status)
-        root.addView(button("打开无障碍设置") {
-            startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-        })
-
-        overview = TextView(this).apply {
-            textSize = 22f; setPadding(0, 18, 0, 0)
+        // ===== 状态卡 =====
+        statusCard = Ui.card(this)
+        val statusRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
         }
-        root.addView(overview)
-
-        root.addView(TextView(this).apply {
-            text = "拦截规则"; textSize = 16f; setPadding(0, 20, 0, 6)
-        })
-        swSkip = switch("开屏广告 · 自动跳过", AppPrefs.splashSkipEnabled) {
-            AppPrefs.splashSkipEnabled = it
+        statusDot = TextView(this).apply {
+            textSize = 26f
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(Ui.dp(this@MainActivity, 44f), Ui.dp(this@MainActivity, 44f))
         }
-        swClose = switch("广告 SDK 全屏页 · 自动关闭", AppPrefs.adActivityEnabled) {
-            AppPrefs.adActivityEnabled = it
+        statusRow.addView(statusDot)
+        val statusTexts = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(Ui.dp(this@MainActivity, 14f), 0, 0, 0)
         }
-        swJump = switch("误触跳转 · 自动返回（名单制）", AppPrefs.autoBackEnabled) {
-            AppPrefs.autoBackEnabled = it
+        statusTitle = Ui.text(this, "", 16f, Ui.ON_SURFACE, bold = true)
+        statusSub = Ui.text(this, "", 12f, Ui.ON_SURFACE_VAR)
+        statusTexts.addView(statusTitle)
+        statusTexts.addView(statusSub)
+        statusRow.addView(statusTexts)
+        statusCard.addView(statusRow)
+        statusBtn = Ui.button(this, "") {}
+        statusCard.addView(statusBtn)
+        root.addView(statusCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = Ui.dp(this@MainActivity, 14f) })
+
+        // ===== 统计卡 =====
+        val statCard = Ui.card(this)
+        statCard.addView(Ui.text(this, "拦截统计", 16f, Ui.ON_SURFACE, bold = true))
+        val nums = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(0, Ui.dp(this@MainActivity, 12f), 0, Ui.dp(this@MainActivity, 6f))
         }
-        root.addView(swSkip)
-        root.addView(swClose)
-        root.addView(swJump)
-        root.addView(button("管理跳转自动返回名单") {
-            startActivity(Intent(this@MainActivity, AppPickerActivity::class.java))
+        statTotal = bigNum("0")
+        statToday = bigNum("0")
+        nums.addView(statColumn(statTotal, "累计拦截"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        nums.addView(vline())
+        nums.addView(statColumn(statToday, "今日拦截"), LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f))
+        statCard.addView(nums)
+        emptyHint = Ui.text(this, "还没有拦截记录 — 打开一个带开屏广告的 App 试试", 12f, Ui.ON_SURFACE_VAR)
+        emptyHint.setPadding(0, Ui.dp(this@MainActivity, 8f), 0, 0)
+        statCard.addView(emptyHint)
+        appList = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
+        statCard.addView(appList)
+        val exportRow = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL }
+        exportRow.addView(Ui.button(this, "导出统计") { exportStats() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.rightMargin = Ui.dp(this@MainActivity, 6f) })
+        exportRow.addView(Ui.button(this, "清空") { confirmClear() }, LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f).also { it.leftMargin = Ui.dp(this@MainActivity, 6f) })
+        statCard.addView(exportRow)
+        root.addView(statCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = Ui.dp(this@MainActivity, 14f) })
+
+        // ===== 规则卡 =====
+        val ruleCard = Ui.card(this)
+        ruleCard.addView(Ui.text(this, "拦截规则", 16f, Ui.ON_SURFACE, bold = true))
+        ruleCard.addView(Ui.switchRow(this, "开屏广告自动跳过", "识别到跳过按钮立即点击", AppPrefs.splashSkipEnabled) { AppPrefs.splashSkipEnabled = it })
+        ruleCard.addView(divider())
+        ruleCard.addView(Ui.switchRow(this, "广告 SDK 全屏页自动关闭", "穿山甲 / 优量汇 / AdMob 等约 20 家", AppPrefs.adActivityEnabled) { AppPrefs.adActivityEnabled = it })
+        ruleCard.addView(divider())
+        ruleCard.addView(Ui.switchRow(this, "误触跳转自动返回", "被广告拉到名单应用时自动返回（默认关）", AppPrefs.autoBackEnabled) { AppPrefs.autoBackEnabled = it })
+        ruleCard.addView(Ui.button(this, "管理跳转返回名单") { startActivity(Intent(this, AppPickerActivity::class.java)) })
+        root.addView(ruleCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = Ui.dp(this@MainActivity, 14f) })
+
+        // ===== 关于/帮助 =====
+        val aboutCard = Ui.card(this)
+        aboutCard.addView(Ui.text(this, "运行保障与说明", 16f, Ui.ON_SURFACE, bold = true))
+        aboutCard.addView(Ui.text(this,
+            "· 拦截通过无障碍服务实现，需要保持后台运行\n" +
+            "· 统计记录的是拦截动作已执行，不代表广告必然关闭\n" +
+            "· 小米/澎湃 OS 建议将省电策略设为无限制并锁定后台\n" +
+            "· 全程离线运行，不上传任何数据", 12f, Ui.ON_SURFACE_VAR).apply {
+            setPadding(0, Ui.dp(this@MainActivity, 8f), 0, Ui.dp(this@MainActivity, 4f))
         })
+        aboutCard.addView(Ui.button(this, "查看完整说明与澎湃 OS 设置指引") { showGuidance() })
+        root.addView(aboutCard)
 
-        root.addView(TextView(this).apply {
-            text = "按 APP 统计"; textSize = 16f; setPadding(0, 20, 0, 6)
-        })
-        root.addView(button("清空统计") { confirmClear() })
-        root.addView(button("导出统计（复制到剪贴板）") { exportStats() })
-        stats = TextView(this).apply { textSize = 14f; setPadding(0, 6, 0, 0) }
-        root.addView(stats)
-
-        recent = TextView(this).apply { textSize = 12f; setPadding(0, 14, 0, 0) }
-        root.addView(recent)
-
-        root.addView(button("运行保障与限制说明") { showGuidance() })
-        root.addView(TextView(this).apply {
-            text = "统计口径：记录的是拦截动作已执行，不代表广告必然被关闭。所有数据仅保存在本机。"
-            textSize = 12f; setPadding(0, 18, 0, 0)
-        })
-
-        setContentView(root)
+        setContentView(scroll)
         requestNotificationPermissionIfNeeded()
     }
 
-    override fun onResume() {
-        super.onResume()
-        refresh()
+    private fun bigNum(v: String) = TextView(this).apply {
+        text = v; textSize = 34f; setTextColor(Ui.PRIMARY); typeface = Typeface.DEFAULT_BOLD
     }
+
+    private fun statColumn(num: TextView, label: String): LinearLayout {
+        return LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            addView(num)
+            addView(Ui.text(this@MainActivity, label, 12f, Ui.ON_SURFACE_VAR))
+        }
+    }
+
+    private fun vline(): View = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(Ui.dp(this@MainActivity, 1f), Ui.dp(this@MainActivity, 40f)).also {
+            it.gravity = Gravity.CENTER_VERTICAL
+        }
+        setBackgroundColor(Ui.OUTLINE)
+    }
+
+    private fun divider(): View = View(this).apply {
+        layoutParams = LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, Ui.dp(this@MainActivity, 1f))
+        setBackgroundColor(Ui.SURFACE_CONTAINER)
+    }
+
+    override fun onResume() { super.onResume(); refresh() }
 
     private fun refresh() {
         val enabled = NotificationHelper.isServiceEnabledInSettings(this)
         val running = AdAccessibilityService.running
-        status.text = when {
-            running -> "拦截引擎：运行中"
-            enabled -> "无障碍已启用，等待系统绑定（可稍后回到本页确认）"
-            else -> "未启用。请在系统设置中开启「清屏 · 广告拦截引擎」"
+        if (running) {
+            statusDot.background = circle(Ui.GREEN_CONTAINER); statusDot.text = "✓"; statusDot.setTextColor(Ui.GREEN)
+            statusTitle.text = "拦截引擎运行中"
+            statusSub.text = "正在监听开屏广告与误触跳转"
+            statusBtn.visibility = ViewGroup.GONE
+        } else if (enabled) {
+            statusDot.background = circle(Ui.PRIMARY_CONTAINER); statusDot.text = "…"; statusDot.setTextColor(Ui.PRIMARY)
+            statusTitle.text = "等待系统启动服务"
+            statusSub.text = "无障碍已授权，回到本页稍候即可确认"
+            statusBtn.visibility = ViewGroup.GONE
+        } else {
+            statusDot.background = circle(Ui.RED_CONTAINER); statusDot.text = "!"; statusDot.setTextColor(Ui.RED)
+            statusTitle.text = "尚未授权无障碍"
+            statusSub.text = "这是拦截功能的唯一前提，点击下方按钮去开启"
+            statusBtn.text = "前往无障碍设置"
+            statusBtn.visibility = ViewGroup.VISIBLE
+            statusBtn.setOnClickListener { startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS)) }
         }
-        overview.text = "累计拦截 " + StatsStore.totalAll() + " 次 · 今日 " + StatsStore.totalToday() + " 次"
+
+        val total = StatsStore.totalAll()
+        val today = StatsStore.totalToday()
+        statTotal.text = total.toString()
+        statToday.text = today.toString()
+        emptyHint.visibility = if (total == 0) ViewGroup.VISIBLE else ViewGroup.GONE
 
         val pm = packageManager
-        val sb = StringBuilder()
+        appList.removeAllViews()
         val rows = StatsStore.snapshot()
-        if (rows.isEmpty()) {
-            sb.append("暂无拦截记录\n")
-        }
-        for (s in rows) {
-            val name = try {
-                pm.getApplicationLabel(pm.getApplicationInfo(s.pkg, 0)).toString()
-            } catch (_: PackageManager.NameNotFoundException) {
-                s.pkg
-            }
-            sb.append(name).append("  ").append(s.total).append(" 次（今日 ").append(s.today).append("）\n")
-            sb.append("  ").append(s.pkg)
-            if (s.lastFrom.isNotBlank()) sb.append("\n  最近来源: ").append(s.lastFrom)
-            sb.append("\n")
-        }
-        stats.text = sb.toString()
-
-        recent.text = "规则分布示例（按应用）:\n" + rows.take(5).joinToString("\n") { s ->
-            "  " + s.pkg + " -> " + s.rules.entries.joinToString(", ") { (k, v) -> ruleName(k) + "×" + v }
+        for ((idx, s) in rows.withIndex()) {
+            if (idx >= 8) break
+            appList.addView(appRow(pm, s))
+            if (idx < 7 && idx < rows.size - 1) appList.addView(divider())
         }
     }
 
-    private fun ruleName(id: String): String = when (id) {
-        "skip" -> "开屏跳过"
-        "close" -> "广告页关闭"
-        "jump" -> "跳转返回"
-        else -> id
+    private fun circle(color: Int): GradientDrawable {
+        val d = GradientDrawable()
+        d.setColor(color); d.shape = GradientDrawable.OVAL
+        return d
+    }
+
+    private fun appRow(pm: PackageManager, s: AppStat): LinearLayout {
+        val row = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL
+            setPadding(0, Ui.dp(this@MainActivity, 10f), 0, Ui.dp(this@MainActivity, 10f))
+        }
+        // 应用图标
+        val icon = ImageView(this).apply {
+            val pad = Ui.dp(this@MainActivity, 6f)
+            setPadding(pad, pad, pad, pad)
+            background = Ui.round(this@MainActivity, Ui.SURFACE_CONTAINER, 12f)
+            try { setImageDrawable(pm.getApplicationIcon(s.pkg)) } catch (_: PackageManager.NameNotFoundException) {
+                setImageResource(R.drawable.ic_app)
+            }
+            layoutParams = LinearLayout.LayoutParams(Ui.dp(this@MainActivity, 40f), Ui.dp(this@MainActivity, 40f))
+            scaleType = ImageView.ScaleType.FIT_CENTER
+            clipToOutline = true
+        }
+        row.addView(icon)
+        val mid = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, ViewGroup.LayoutParams.WRAP_CONTENT, 1f)
+            setPadding(Ui.dp(this@MainActivity, 12f), 0, Ui.dp(this@MainActivity, 8f), 0)
+        }
+        val name = try { pm.getApplicationLabel(pm.getApplicationInfo(s.pkg, 0)).toString() } catch (_: PackageManager.NameNotFoundException) { s.pkg }
+        mid.addView(Ui.text(this, name, 14f, Ui.ON_SURFACE, bold = true))
+        val ruleDesc = s.rules.entries.sortedByDescending { it.value }.joinToString(" · ") { (k, v) -> ruleName(k) + " " + v }
+        mid.addView(Ui.text(this, ruleDesc, 11f, Ui.ON_SURFACE_VAR).apply { setPadding(0, Ui.dp(this@MainActivity, 2f), 0, 0) })
+        row.addView(mid)
+        // 右侧次数徽章
+        row.addView(TextView(this).apply {
+            text = s.total.toString()
+            textSize = 15f
+            setTextColor(Ui.PRIMARY)
+            typeface = Typeface.DEFAULT_BOLD
+            background = Ui.pill(this@MainActivity, Ui.PRIMARY_CONTAINER)
+            gravity = Gravity.CENTER
+            minWidth = Ui.dp(this@MainActivity, 44f)
+            setPadding(Ui.dp(this@MainActivity, 10f), Ui.dp(this@MainActivity, 4f), Ui.dp(this@MainActivity, 10f), Ui.dp(this@MainActivity, 4f))
+        })
+        return row
+    }
+
+    private fun ruleName(id: String) = when (id) {
+        "skip" -> "开屏"; "close" -> "关闭"; "jump" -> "返回"; else -> id
     }
 
     private fun confirmClear() {
         AlertDialog.Builder(this)
             .setTitle("清空统计")
             .setMessage("将删除所有本地拦截记录，确定吗？")
-            .setPositiveButton("清空") { _, _ ->
-                StatsStore.clear()
-                refresh()
-            }
+            .setPositiveButton("清空") { _, _ -> StatsStore.clear(); refresh() }
             .setNegativeButton("取消", null)
             .show()
     }
@@ -165,35 +284,20 @@ class MainActivity : Activity() {
         val text = buildString {
             append("清屏拦截统计 ").append(SimpleDateFormat("yyyy-MM-dd HH:mm", Locale.getDefault()).format(Date())).append("\n")
             append("累计 ").append(StatsStore.totalAll()).append(" · 今日 ").append(StatsStore.totalToday()).append("\n\n")
-            for (s in rows) {
-                append(s.pkg).append(" total=").append(s.total).append(" today=").append(s.today)
-                    .append(" rules=").append(s.rules).append("\n")
-            }
+            for (s in rows) append(s.pkg).append(" total=").append(s.total).append(" today=").append(s.today).append(" rules=").append(s.rules).append("\n")
         }
-        val cm = getSystemService(CLIPBOARD_SERVICE) as ClipboardManager
-        cm.setPrimaryClip(ClipData.newPlainText("QingPing stats", text))
-        Toast.makeText(this, "统计已复制到剪贴板", Toast.LENGTH_SHORT).show()
+        (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager).setPrimaryClip(ClipData.newPlainText("QingPing stats", text))
+        Toast.makeText(this, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
     }
 
     private fun showGuidance() {
         AlertDialog.Builder(this)
             .setTitle("运行保障与限制")
             .setMessage(
-                "【为什么需要无障碍权限】\n" +
-                    "清屏通过无障碍服务读取屏幕控件并执行模拟点击，这是无 Root 环境下拦截开屏广告的唯一可行方案。\n\n" +
-                    "【开机自动运行】\n" +
-                    "服务在系统设置中启用后由系统（system_server）绑定，开机后自动恢复，无需应用自启。若被 ROM 清理，开机时会尝试发通知提醒。\n\n" +
-                    "【小米/澎湃 OS 建议】\n" +
-                    "1. 设置 > 应用管理 > 清屏 > 省电策略：无限制\n" +
-                    "2. 自启动权限：允许（用于开机提醒）\n" +
-                    "3. 最近任务中锁定清屏卡片\n" +
-                    "4. 神隐模式/省电优化中对清屏关闭限制\n\n" +
-                    "【能力边界】\n" +
-                    "1. 纯图片/自绘广告（无可访问性节点）无法识别\n" +
-                    "2. 信息流/横幅等非全屏广告不做处理，避免误点\n" +
-                    "3. 点击成功不等于广告必然关闭；统计记录的是动作执行\n" +
-                    "4. 无 Root 无法阻止广告加载，只能识别后自动关闭\n" +
-                    "5. 关闭系统通知权限不影响拦截，只影响开机提醒"
+                "【为什么需要无障碍权限】\n清屏通过无障碍服务读取屏幕控件并模拟点击，这是无 Root 环境下拦截开屏广告的唯一可行方案。\n\n" +
+                "【开机自动运行】\n服务在系统设置中启用后由系统绑定，开机自动恢复。若被 ROM 清理，会尝试发通知提醒。\n\n" +
+                "【小米/澎湃 OS 建议】\n1. 应用信息 > 省电策略：无限制\n2. 自启动权限：允许\n3. 最近任务中锁定清屏卡片\n4. 神隐模式/省电优化中关闭限制\n\n" +
+                "【能力边界】\n1. 纯图片/自绘广告无法识别\n2. 信息流/横幅广告不做处理，避免误点\n3. 点击成功不等于广告必然关闭\n4. 无 Root 无法阻止广告加载\n5. 通知权限不影响拦截，只影响掉线提醒"
             )
             .setPositiveButton("打开应用信息") { _, _ ->
                 startActivity(Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS, Uri.parse("package:$packageName")))
@@ -204,24 +308,9 @@ class MainActivity : Activity() {
 
     private fun requestNotificationPermissionIfNeeded() {
         if (Build.VERSION.SDK_INT >= 33 &&
-            checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED
+            checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS) != android.content.pm.PackageManager.PERMISSION_GRANTED
         ) {
-            requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
+            requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 1)
         }
-    }
-
-    private fun button(label: String, action: () -> Unit) = Button(this).apply {
-        text = label
-        setOnClickListener { action() }
-        layoutParams = LinearLayout.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-    }
-
-    private fun switch(label: String, checked: Boolean, onChange: (Boolean) -> Unit) = Switch(this).apply {
-        text = label
-        isChecked = checked
-        setOnCheckedChangeListener { _, isChecked -> onChange(isChecked) }
-        gravity = Gravity.START
     }
 }
