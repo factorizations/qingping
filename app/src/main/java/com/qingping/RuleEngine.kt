@@ -12,8 +12,16 @@ package com.qingping
  */
 object RuleEngine {
 
-    /** 开屏跳过文本（包含匹配，忽略大小写） */
-    private val SKIP_TEXT = Regex("跳过|skip", RegexOption.IGNORE_CASE)
+    /**
+     * 开屏跳过文本（包含匹配，忽略大小写）。
+     * 覆盖实测样本：
+     *   "跳过"、"跳过 02"、"跳过广告"、"1s 跳过广告"（航旅纵横）、
+     *   "Skip"、"Skip Ad"、"5s后跳过"、"关闭广告 3s"。
+     */
+    private val SKIP_TEXT = Regex(
+        "跳过|skip\\s*ad|\\bskip\\b|ad\\s*close|\\d+\\s*[sS秒]?\\s*关闭广告",
+        RegexOption.IGNORE_CASE
+    )
 
     /** 广告页关闭按钮的精确文本/描述 */
     private val CLOSE_TEXT = setOf(

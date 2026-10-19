@@ -10,6 +10,7 @@ object AppPrefs {
     private const val KEY_JUMP = "auto_back_enabled"
     private const val KEY_PKGS = "auto_back_pkgs"
     private const val KEY_EVER = "service_ever_enabled"
+    private const val KEY_DIAG = "diagnostics_enabled"
 
     private lateinit var sp: SharedPreferences
     private var cachedPkgs: MutableSet<String>? = null
@@ -48,6 +49,11 @@ object AppPrefs {
             cachedPkgs = HashSet(v)
             sp.edit().putStringSet(KEY_PKGS, HashSet(v)).apply()
         }
+
+    /** 诊断模式：记录界面控件快照，便于排查"为什么没跳过"（默认关） */
+    var diagnosticsEnabled: Boolean
+        get() = sp.getBoolean(KEY_DIAG, false)
+        set(v) = sp.edit().putBoolean(KEY_DIAG, v).apply()
 
     /** 用户是否启用过无障碍服务（用于开机提醒判断） */
     var serviceEverEnabled: Boolean

@@ -65,12 +65,37 @@ object StatsStore {
     @Synchronized
     fun snapshot(): List<AppStat> = apps.values.sortedByDescending { it.total }
 
+    // ---------- 诊断：最近界面快照 ----------
+
+    /** 最近若干次界面快照（最多 5 条），用于排查"为什么没跳过" */
+    private val diag = ArrayDeque<DiagEntry>()
+    private const val DIAG_MAX = 5
+
+    @Synchronized
+    fun recordDiag(pkg: String, reason: String, nodes: List<String>) {
+        if (!AppPrefs.diagnosticsEnabled) return
+        diag.addFirst(DiagEntry(System.currentTimeMillis(), pkg, reason, nodes.toList()))
+        while (diag.size > DIAG_MAX) diag.removeLast()
+        dirty = true
+        handler.removeCallbacks(saveRunnable)
+        handler.postDelayed(saveRunnable, 2000)
+    }
+
+    @Synchronized fun diagSnapshot(): List<DiagEntry> = diag.toList()
+
+    @Synchronized fun clearDiag() {
+        diag.clear()
+        dirty = true
+        flush()
+    }
+
     @Synchronized fun totalAll(): Int = apps.values.sumOf { it.total }
     @Synchronized fun totalToday(): Int = apps.values.sumOf { it.today }
 
     @Synchronized
     fun clear() {
         apps.clear()
+        diag.clear()
         dirty = true
         flush()
     }
@@ -96,6 +121,18 @@ object StatsStore {
                 arr.put(o)
             }
             root.put("apps", arr)
+            val darr = JSONArray()
+            for (d in diag) {
+                val o = JSONObject()
+                o.put("at", d.at)
+                o.put("pkg", d.pkg)
+                o.put("reason", d.reason)
+                val ns = JSONArray()
+                for (n in d.nodes) ns.put(n)
+                o.put("nodes", ns)
+                darr.put(o)
+            }
+            root.put("diag", darr)
             file.writeText(root.toString())
             dirty = false
         } catch (t: Throwable) {
@@ -123,8 +160,25 @@ object StatsStore {
                 if (r != null) for (k in r.keys()) s.rules[k] = r.optInt(k)
                 apps[s.pkg] = s
             }
+            val darr = root.optJSONArray("diag")
+            if (darr != null) for (i in 0 until darr.length()) {
+                val o = darr.getJSONObject(i)
+                val ns = mutableListOf<String>()
+                val narr = o.optJSONArray("nodes")
+                if (narr != null) for (j in 0 until narr.length()) ns.add(narr.getString(j))
+                diag.addLast(DiagEntry(o.optLong("at"), o.optString("pkg"), o.optString("reason"), ns))
+            }
+            while (diag.size > DIAG_MAX) diag.removeLast()
         } catch (t: Throwable) {
             Log.w(TAG, "load stats failed", t)
         }
     }
 }
+
+/** 一次界面快照（诊断用） */
+class DiagEntry(
+    val at: Long,
+    val pkg: String,
+    val reason: String,
+    val nodes: List<String>
+)

@@ -11,8 +11,8 @@ android {
         applicationId = "com.qingping"
         minSdk = 26
         targetSdk = 35
-        versionCode = 5
-        versionName = "0.6"
+        versionCode = 6
+        versionName = "0.7"
     }
 
     // 固定签名：qingping.jks 随仓库分发，保证每次云构建 APK 签名一致，

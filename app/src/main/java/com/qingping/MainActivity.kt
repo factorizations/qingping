@@ -64,7 +64,7 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(Ui.dp(this@MainActivity, 30f), Ui.dp(this@MainActivity, 30f))
         })
         title.addView(Ui.text(this, "  清屏", 22f, Ui.ON_SURFACE, bold = true))
-        title.addView(Ui.text(this, "  v0.6", 12f, Ui.ON_SURFACE_VAR).apply { gravity = Gravity.BOTTOM })
+        title.addView(Ui.text(this, "  v0.7", 12f, Ui.ON_SURFACE_VAR).apply { gravity = Gravity.BOTTOM })
         root.addView(title)
         root.addView(Ui.text(this, "自动跳过开屏广告 · 拦截误触跳转 · 数据仅存本机", 12f, Ui.ON_SURFACE_VAR).apply {
             setPadding(0, Ui.dp(this@MainActivity, 4f), 0, Ui.dp(this@MainActivity, 14f))
@@ -134,6 +134,23 @@ class MainActivity : Activity() {
         ruleCard.addView(Ui.switchRow(this, "误触跳转自动返回", "被广告拉到名单应用时自动返回（默认关）", AppPrefs.autoBackEnabled) { AppPrefs.autoBackEnabled = it })
         ruleCard.addView(Ui.button(this, "管理跳转返回名单") { startActivity(Intent(this, AppPickerActivity::class.java)) })
         root.addView(ruleCard, LinearLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
+        ).also { it.bottomMargin = Ui.dp(this@MainActivity, 14f) })
+
+        // ===== 诊断卡（0.7 新增）=====
+        val diagCard = Ui.card(this)
+        diagCard.addView(Ui.text(this, "识别诊断", 16f, Ui.ON_SURFACE, bold = true))
+        diagCard.addView(Ui.text(this,
+            "遇到某个 App 没跳过？打开下面的开关，再复现一次广告，然后点「查看界面快照」把结果反馈给开发者。",
+            12f, Ui.ON_SURFACE_VAR).apply {
+            setPadding(0, Ui.dp(this@MainActivity, 6f), 0, Ui.dp(this@MainActivity, 4f))
+        })
+        diagCard.addView(Ui.switchRow(this, "记录界面快照", "仅本机保存，最多 5 条，不含个人内容", AppPrefs.diagnosticsEnabled) {
+            AppPrefs.diagnosticsEnabled = it
+        })
+        diagCard.addView(divider())
+        diagCard.addView(Ui.button(this, "查看界面快照") { showDiag() })
+        root.addView(diagCard, LinearLayout.LayoutParams(
             ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
         ).also { it.bottomMargin = Ui.dp(this@MainActivity, 14f) })
 
@@ -291,6 +308,38 @@ class MainActivity : Activity() {
         Toast.makeText(this, "已复制到剪贴板", Toast.LENGTH_SHORT).show()
     }
 
+
+    private fun showDiag() {
+        val rows = StatsStore.diagSnapshot()
+        if (rows.isEmpty()) {
+            AlertDialog.Builder(this)
+                .setTitle("界面快照")
+                .setMessage("还没有快照。\n\n请先打开「记录界面快照」开关，然后打开那个没跳过广告的 App，等广告出现几秒，再回到这里查看。")
+                .setPositiveButton("知道了", null)
+                .show()
+            return
+        }
+        val fmt = SimpleDateFormat("HH:mm:ss", Locale.getDefault())
+        val text = buildString {
+            for (d in rows) {
+                append("=== ").append(fmt.format(Date(d.at))).append("  ").append(d.pkg)
+                append("  (").append(d.reason).append(")\n")
+                for (n in d.nodes) append(n).append("\n")
+                append("\n")
+            }
+        }
+        AlertDialog.Builder(this)
+            .setTitle("最近界面快照")
+            .setMessage(if (text.length > 8000) text.substring(0, 8000) + "\n…（已截断）" else text)
+            .setPositiveButton("复制") { _, _ ->
+                (getSystemService(CLIPBOARD_SERVICE) as ClipboardManager)
+                    .setPrimaryClip(ClipData.newPlainText("QingPing diag", text))
+                Toast.makeText(this, "已复制，可直接反馈给开发者", Toast.LENGTH_SHORT).show()
+            }
+            .setNeutralButton("清空快照") { _, _ -> StatsStore.clearDiag(); Toast.makeText(this, "已清空", Toast.LENGTH_SHORT).show() }
+            .setNegativeButton("关闭", null)
+            .show()
+    }
     private fun showGuidance() {
         AlertDialog.Builder(this)
             .setTitle("运行保障与限制")
