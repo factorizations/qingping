@@ -80,12 +80,9 @@ object RuleEngine {
     fun isSkipId(viewId: String?): Boolean =
         viewId != null && viewId.substringAfterLast('/', viewId).lowercase().contains(SKIP_ID_HINT)
 
-    /** 返回需要等待的毫秒数；无倒计时返回 0（立即点击） */
+    /** @deprecated 0.4 起不再等待倒计时：按钮倒计时期间即可点击。恒返回 0。 */
     fun skipDelayMs(text: String): Long {
-        val m = COUNTDOWN.find(text) ?: return 0L
-        val sec = (m.groupValues[1].ifEmpty { m.groupValues[2] }.ifEmpty { m.groupValues[3] })
-            .toIntOrNull() ?: 0
-        return if (sec in 1..15) sec * 1000L else 0L
+        return 0L
     }
 
     fun isAdActivity(className: String): Boolean =

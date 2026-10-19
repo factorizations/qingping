@@ -41,7 +41,6 @@ class AdAccessibilityService : AccessibilityService() {
 
     private val handler = Handler(Looper.getMainLooper())
     private val cooldowns = HashMap<String, Long>()
-    private val pendingSkips = HashSet<String>()
     private var lastForegroundPkg = ""
 
     override fun onServiceConnected() {
@@ -129,31 +128,14 @@ class AdAccessibilityService : AccessibilityService() {
         tryClick(pkg, node, text, RuleEngine.skipDelayMs(text))
     }
 
-    private fun tryClick(pkg: String, node: AccessibilityNodeInfo, text: String, delayMs: Long) {
-        if (delayMs <= 0) {
-            if (shouldFire("skipclick:$pkg", System.currentTimeMillis(), CLICK_COOLDOWN_MS) &&
-                clickNode(node)
-            ) {
+    private fun tryClick(pkg: String, node: AccessibilityNodeInfo, text: String, @Suppress("UNUSED_PARAMETER") delayMs: Long) {
+        // 0.4 修复：不再解析倒计时等待。"跳过 02" 这类按钮在倒计时期间本就可点，
+        // 等待会导致连环重排（02->01->...）直到广告播完。识别到即点。
+        if (shouldFire("skipclick:$pkg", System.currentTimeMillis(), CLICK_COOLDOWN_MS)) {
+            if (clickNode(node)) {
                 StatsStore.record(pkg, "skip")
                 Log.i(TAG, "skip clicked: $pkg text=\"$text\"")
             }
-            return
-        }
-        // 倒计时未到：先记下意图，到点后重新扫描再点（防止重复排程用 pendingSkips 去重）
-        val key = "$pkg|$text"
-        if (pendingSkips.add(key)) {
-            handler.postDelayed({
-                pendingSkips.remove(key)
-                val root = rootInActiveWindow ?: return@postDelayed
-                if (root.packageName?.toString() != pkg) return@postDelayed
-                val n = findSkipNode(root) ?: return@postDelayed
-                if (shouldFire("skipclick:$pkg", System.currentTimeMillis(), CLICK_COOLDOWN_MS) &&
-                    clickNode(n)
-                ) {
-                    StatsStore.record(pkg, "skip")
-                    Log.i(TAG, "skip clicked after countdown: $pkg text=\"$text\"")
-                }
-            }, delayMs)
         }
     }
 
