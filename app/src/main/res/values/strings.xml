@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">清屏</string>
+    <string name="accessibility_service_label">清屏 · 广告拦截引擎</string>
+    <string name="accessibility_description">清屏在识别到开屏广告的跳过按钮、常见广告 SDK 全屏页或误触跳转时自动处理，并在本机记录统计。所有分析均在本地完成，不联网、不上传任何数据。</string>
+    <string name="title_app_picker">跳转自动返回名单</string>
+</resources>
