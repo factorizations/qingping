@@ -50,6 +50,13 @@ jobs:
             echo "::error::$line"
           done
           test -f build.log && tail -60 build.log || true
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: build.log
+          retention-days: 3
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
