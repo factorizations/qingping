@@ -1,4 +1,4 @@
-# 清屏 QingPing 0.3
+# 清屏 QingPing 0.6
 
 一款完全本地运行的安卓广告拦截工具：通过无障碍服务自动关闭其他应用的开屏广告、常见广告 SDK 全屏页，并对误触跳转做自动返回兜底。所有拦截行为按应用统计，数据仅保存在本机，不联网、不上传。
 
@@ -6,7 +6,7 @@
 
 | 功能 | 说明 | 默认 |
 | --- | --- | --- |
-| 开屏广告自动跳过 | 识别「跳过 / Skip」控件，支持倒计时解析（如"跳过 3"等 3 秒后再点）与控件 id 双通道匹配 | 开 |
+| 开屏广告自动跳过 | 识别「跳过 / Skip / 跳过 3」等控件，文本 + 控件 id 双通道匹配。**识别即点**，不等待倒计时（等待会让广告播完） | 开 |
 | 广告 SDK 全屏页关闭 | 按类名前缀识别穿山甲、优量汇、快手、AdMob 等约 20 家广告 SDK 的全屏页，先找关闭按钮，找不到才按返回键 | 开 |
 | 误触跳转自动返回 | 广告把用户拉到应用商店等名单内应用时自动按返回键。名单制，用户可自由勾选 | 关 |
 | 按应用统计 | 累计/今日/规则分布，JSON 文件本地持久化，支持复制导出、一键清空 | — |
@@ -28,6 +28,21 @@
 - **点击成功 ≠ 广告关闭**：统计记录的是"拦截动作已执行"。
 - **服务可能被 ROM 杀掉**：应用无法阻止系统清理，只能提醒用户手动恢复。
 
+## 签名一致性
+
+本项目使用**固定签名密钥**：仓库根目录的 `qingping.jks`（别名 `qingping`，口令 `qingping`），`app/build.gradle.kts` 里 debug 与 release 都指向它。CI 每次构建产出的 APK 签名完全相同，可直接覆盖安装升级，不会出现 `INSTALL_FAILED_UPDATE_INCOMPATIBLE`。
+
+证书指纹（SHA-256）：
+
+```
+68:CC:26:AC:72:54:20:17:0B:03:8C:56:3C:9E:CE:1B:
+30:96:C1:13:2D:A7:5B:10:03:46:F1:C7:28:29:22:37
+```
+
+安装后可用 `apksigner verify --print-certs 你的.apk` 核对。CI 的 `Verify APK signature` 步骤每次构建都会打印该指纹。
+
+> 该密钥是公开的个人调试签名，仅用于保证升级连续性，**不适合上架应用商店**。若将来发布正式版，请生成新密钥并更换 `signingConfigs`（届时签名变化，需先卸载旧版）。
+
 ## 安装
 
 1. 从 GitHub Actions 下载最新构建的 APK（见下方"云构建"），或本地 `./gradlew :app:assembleRelease`。
@@ -45,7 +60,7 @@
 
 - 零第三方依赖：纯 Kotlin + 平台 API。统计用 org.json + JSON 文件（`filesDir/stats.json`），配置用 SharedPreferences——刻意不用 Room/kapt/AndroidX，把云构建失败面降到最低。
 - 无障碍服务订阅 `TYPE_WINDOW_STATE_CHANGED` + `TYPE_WINDOW_CONTENT_CHANGED`，事件回调内全程 try/catch，异常绝不外抛（否则系统可能禁用服务）。
-- 保守点击策略：优先 `performAction(ACTION_CLICK)`，逐级向上找可点击父节点，最后才用无障碍手势点击控件中心坐标；带 2500ms 冷却与 pendingSkips 去重，绝不盲点屏幕坐标。
+- 保守点击策略：优先 `performAction(ACTION_CLICK)`，逐级向上找可点击父节点，最后才用无障碍手势点击控件中心坐标；带 2500ms 冷却去重，绝不盲点屏幕坐标。
 - 误触跳转返回带 5s 冷却，且仅对用户显式勾选的名单包名生效，默认名单只含各家应用商店。
 
 ## 云构建
@@ -60,7 +75,8 @@ app/src/main/java/com/qingping/
   RuleEngine.kt               静态规则（文本/id/SDK 前缀/默认名单）
   StatsStore.kt               JSON 文件统计
   AppPrefs.kt                 配置（开关/名单）
-  MainActivity.kt             主界面（状态/开关/统计）
+  MainActivity.kt             主界面（状态卡/统计卡/规则卡）
+  Ui.kt                       纯代码 Material 组件库（零 XML）
   AppPickerActivity.kt        跳转返回名单编辑
   NotificationHelper.kt       掉线提醒通知
   BootReceiver.kt             开机兜底

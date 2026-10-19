@@ -27,7 +27,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * 主界面（0.5 重设计）：Material 风格三卡布局。
+ * 主界面（0.5 重设计，0.6 沿用）：Material 风格三卡布局。
  * 1) 状态卡：服务运行状态大标识 + 一键授权
  * 2) 统计卡：累计/今日大数字 + 按应用排行（带图标）
  * 3) 规则卡：三条开关 + 名单入口
@@ -64,7 +64,7 @@ class MainActivity : Activity() {
             layoutParams = LinearLayout.LayoutParams(Ui.dp(this@MainActivity, 30f), Ui.dp(this@MainActivity, 30f))
         })
         title.addView(Ui.text(this, "  清屏", 22f, Ui.ON_SURFACE, bold = true))
-        title.addView(Ui.text(this, "  v0.5", 12f, Ui.ON_SURFACE_VAR).apply { gravity = Gravity.BOTTOM })
+        title.addView(Ui.text(this, "  v0.6", 12f, Ui.ON_SURFACE_VAR).apply { gravity = Gravity.BOTTOM })
         root.addView(title)
         root.addView(Ui.text(this, "自动跳过开屏广告 · 拦截误触跳转 · 数据仅存本机", 12f, Ui.ON_SURFACE_VAR).apply {
             setPadding(0, Ui.dp(this@MainActivity, 4f), 0, Ui.dp(this@MainActivity, 14f))
@@ -298,6 +298,7 @@ class MainActivity : Activity() {
                 "【为什么需要无障碍权限】\n清屏通过无障碍服务读取屏幕控件并模拟点击，这是无 Root 环境下拦截开屏广告的唯一可行方案。\n\n" +
                 "【开机自动运行】\n服务在系统设置中启用后由系统绑定，开机自动恢复。若被 ROM 清理，会尝试发通知提醒。\n\n" +
                 "【小米/澎湃 OS 建议】\n1. 应用信息 > 省电策略：无限制\n2. 自启动权限：允许\n3. 最近任务中锁定清屏卡片\n4. 神隐模式/省电优化中关闭限制\n\n" +
+                "【签名与升级】\n本项目使用固定签名密钥，后续版本可直接覆盖安装升级，无需卸载。\n\n" +
                 "【能力边界】\n1. 纯图片/自绘广告无法识别\n2. 信息流/横幅广告不做处理，避免误点\n3. 点击成功不等于广告必然关闭\n4. 无 Root 无法阻止广告加载\n5. 通知权限不影响拦截，只影响掉线提醒"
             )
             .setPositiveButton("打开应用信息") { _, _ ->
