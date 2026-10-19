@@ -11,13 +11,28 @@ android {
         applicationId = "com.qingping"
         minSdk = 26
         targetSdk = 35
-        versionCode = 3
-        versionName = "0.3.0"
+        versionCode = 5
+        versionName = "0.6"
+    }
+
+    // 固定签名：qingping.jks 随仓库分发，保证每次云构建 APK 签名一致，
+    // 手机上可覆盖安装/升级（不会出现 INSTALL_FAILED_UPDATE_INCOMPATIBLE）。
+    signingConfigs {
+        create("stable") {
+            storeFile = rootProject.file("qingping.jks")
+            storePassword = "qingping"
+            keyAlias = "qingping"
+            keyPassword = "qingping"
+        }
     }
 
     buildTypes {
+        debug {
+            signingConfig = signingConfigs.getByName("stable")
+        }
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.getByName("stable")
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
