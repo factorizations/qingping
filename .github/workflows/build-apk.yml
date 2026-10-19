@@ -41,7 +41,15 @@ jobs:
           test -f settings.gradle.kts && echo "settings.gradle.kts OK"
 
       - name: Build debug APK
-        run: gradle -p . --no-daemon assembleDebug
+        run: gradle -p . --no-daemon assembleDebug 2>&1 | tee build.log
+        # 失败时把 Kotlin/Gradle 错误行透出为 annotation，便于远程诊断
+      - name: Report compile errors
+        if: failure()
+        run: |
+          grep -E "^e: |error:|Execution failed" build.log | head -40 | while read -r line; do
+            echo "::error::$line"
+          done
+          test -f build.log && tail -60 build.log || true
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
